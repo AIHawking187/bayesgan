@@ -20,11 +20,11 @@ from bgan_semi import BDCGAN_Semi
 
 def get_session():
     if tf.get_default_session() is None:
-        print "Creating new session"
+        print("Creating new session")
         tf.reset_default_graph()
         _SESSION = tf.InteractiveSession()
     else:
-        print "Using old session"
+        print("Using old session")
         _SESSION = tf.get_default_session()
 
     return _SESSION
@@ -43,17 +43,17 @@ def get_gan_labels(lbls):
 def get_supervised_batches(dataset, size, batch_size, class_ids):
 
     def batchify_with_size(sampled_imgs, sampled_labels, size):
-        rand_idx = np.random.choice(range(sampled_imgs.shape[0]), size, replace=False)
+        rand_idx = np.random.choice(list(range(sampled_imgs.shape[0])), size, replace=False)
         imgs_ = sampled_imgs[rand_idx]
         lbls_ = sampled_labels[rand_idx]
-        rand_idx = np.random.choice(range(imgs_.shape[0]), batch_size, replace=True)
+        rand_idx = np.random.choice(list(range(imgs_.shape[0])), batch_size, replace=True)
         imgs_ = imgs_[rand_idx]
         lbls_ = lbls_[rand_idx] 
         return imgs_, lbls_
 
     labeled_image_batches, lblss = [], []
     num_passes = int(ceil(float(size) / batch_size))
-    for _ in xrange(num_passes):
+    for _ in range(num_passes):
         for class_id in class_ids:
             labeled_image_batch, lbls = dataset.next_batch(int(ceil(float(batch_size)/len(class_ids))),
                                                            class_id=class_id)
@@ -117,8 +117,8 @@ def get_test_accuracy(session, dcgan, all_test_img_batches, all_test_lbls):
     semi_sup_acc = (100. * np.sum(np.argmax(test_d_probs, 1) == np.argmax(test_lbls, 1)))\
               / test_lbls.shape[0]
         
-    print "Sup acc: %.5f" % (sup_acc)
-    print "Semi-sup acc: %.5f" % (semi_sup_acc)
+    print("Sup acc: %.5f" % (sup_acc))
+    print("Semi-sup acc: %.5f" % (semi_sup_acc))
 
     return sup_acc, semi_sup_acc
     
@@ -140,10 +140,10 @@ def b_dcgan(dataset, args):
                         df_dim=args.df_dim, ml=(args.ml and args.J==1 and args.M==1 and args.J_d==1),
                         num_classes=dataset.num_classes)
     
-    print "Starting session"
+    print("Starting session")
     session.run(tf.global_variables_initializer())
 
-    print "Starting training loop"
+    print("Starting training loop")
         
     num_train_iter = args.train_iter
 
@@ -151,7 +151,7 @@ def b_dcgan(dataset, args):
         # implement own data feeder if data doesnt fit in memory
         supervised_batches = dataset.supervised_batches(args.N, batch_size)
     else:
-        supervised_batches = get_supervised_batches(dataset, args.N, batch_size, range(dataset.num_classes))
+        supervised_batches = get_supervised_batches(dataset, args.N, batch_size, list(range(dataset.num_classes)))
 
     test_image_batches, test_label_batches = get_test_batches(dataset, batch_size)
 
@@ -166,7 +166,7 @@ def b_dcgan(dataset, args):
     for train_iter in range(num_train_iter):
 
         if train_iter == 5000:
-            print "Switching to user-specified optimizer"
+            print("Switching to user-specified optimizer")
             optimizer_dict = {"disc_semi": dcgan.d_optims_semi,
                               "sup_d": dcgan.s_optim,
                               "gen": dcgan.g_optims_semi}
@@ -175,7 +175,7 @@ def b_dcgan(dataset, args):
                                                     min(1.0, (train_iter*batch_size)/float(dataset_size)))
 
         image_batch, _ = dataset.next_batch(batch_size, class_id=None)       
-        labeled_image_batch, labels = supervised_batches.next()
+        labeled_image_batch, labels = next(supervised_batches)
 
         ### compute disc losses
         batch_z = np.random.uniform(-1, 1, [batch_size, z_dim, dcgan.num_gen])
@@ -201,19 +201,19 @@ def b_dcgan(dataset, args):
 
         if train_iter > 0 and train_iter % args.n_save == 0:
 
-            print "Iter %i" % train_iter
-            print "Disc losses = %s" % (", ".join(["%.2f" % dl for dl in d_losses]))
-            print "Gen losses = %s" % (", ".join(["%.2f" % gl for gl in g_losses]))
+            print("Iter %i" % train_iter)
+            print("Disc losses = %s" % (", ".join(["%.2f" % dl for dl in d_losses])))
+            print("Gen losses = %s" % (", ".join(["%.2f" % gl for gl in g_losses])))
             
             # get test set performance on real labels only for both GAN-based classifier and standard one
             s_acc, ss_acc = get_test_accuracy(session, dcgan, test_image_batches, test_label_batches)
-            print "Sup classification acc: %.2f" % (s_acc)
-            print "Semi-sup classification acc: %.2f" % (ss_acc)
+            print("Sup classification acc: %.2f" % (s_acc))
+            print("Semi-sup classification acc: %.2f" % (ss_acc))
 
-            print "saving results and samples"
+            print("saving results and samples")
 
-            results = {"disc_losses": map(float, d_losses),
-                       "gen_losses": map(float, g_losses),
+            results = {"disc_losses": list(map(float, d_losses)),
+                       "gen_losses": list(map(float, g_losses)),
                        "supervised_acc": float(s_acc),
                        "semi_supervised_acc": float(ss_acc),
                        "timestamp": time.time()}
@@ -222,7 +222,7 @@ def b_dcgan(dataset, args):
                 json.dump(results, fp)
             
             if args.save_samples:
-                for zi in xrange(dcgan.num_gen):
+                for zi in range(dcgan.num_gen):
                     _imgs, _ps = [], []
                     for _ in range(10):
                         z_sampler = np.random.uniform(-1, 1, size=(batch_size, z_dim))
@@ -245,7 +245,7 @@ def b_dcgan(dataset, args):
                                     **var_dict)
             
 
-            print "done"
+            print("done")
         
 
 
@@ -375,7 +375,7 @@ if __name__ == "__main__":
     tf.set_random_seed(args.random_seed)
 
     if not os.path.exists(args.out_dir):
-        print "Creating %s" % args.out_dir
+        print("Creating %s" % args.out_dir)
         os.makedirs(args.out_dir)
     args.out_dir = os.path.join(args.out_dir, "bgan_%s_%i" % (args.dataset, int(time.time())))
     os.makedirs(args.out_dir)

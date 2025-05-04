@@ -137,14 +137,14 @@ class BDCGAN(object):
                                                   ("d_h_out_lin_b", (self.K,))]))
 
 
-        for k, v in self.gen_output_dims.items():
-            print "%s: %s" % (k, v)
-        print '****'
-        for k, v in self.gen_weight_dims.items():
-            print "%s: %s" % (k, v)
-        print '****'
-        for k, v in self.disc_weight_dims.items():
-            print "%s: %s" % (k, v)
+        for k, v in list(self.gen_output_dims.items()):
+            print("%s: %s" % (k, v))
+        print('****')
+        for k, v in list(self.gen_weight_dims.items()):
+            print("%s: %s" % (k, v))
+        print('****')
+        for k, v in list(self.disc_weight_dims.items()):
+            print("%s: %s" % (k, v))
 
 
 
@@ -219,10 +219,10 @@ class BDCGAN(object):
 
         param_list = []
         with tf.variable_scope(scope_str) as scope:
-            for zi in xrange(numz):
-                for m in xrange(self.num_mcmc):
+            for zi in range(numz):
+                for m in range(self.num_mcmc):
                     wgts_ = AttributeDict()
-                    for name, shape in weight_dims.iteritems():
+                    for name, shape in weight_dims.items():
                         wgts_[name] = tf.get_variable("%s_%04d_%04d" % (name, zi, m),
                                                       shape, initializer=tf.random_normal_initializer(stddev=0.02))
                     param_list.append(wgts_)
@@ -232,7 +232,7 @@ class BDCGAN(object):
     def build_bgan_graph(self):
     
         self.inputs = tf.placeholder(tf.float32,
-                                     [self.batch_size] + self.x_dim, name='real_images')
+                                     [self.batch_size] + list(self.x_dim), name='real_images')
 
         self.z = tf.placeholder(tf.float32, [self.batch_size, self.z_dim, self.num_gen], name='z')
         self.z_sampler = tf.placeholder(tf.float32, [self.batch_size, self.z_dim], name='z_sampler')
@@ -247,8 +247,8 @@ class BDCGAN(object):
         # compile all disciminative weights
         t_vars = tf.trainable_variables()
         self.d_vars = []
-        for di in xrange(self.num_disc):
-            for m in xrange(self.num_mcmc):
+        for di in range(self.num_disc):
+            for m in range(self.num_mcmc):
                 self.d_vars.append([var for var in t_vars if 'd_' in var.name and "_%04d_%04d" % (di, m) in var.name])
 
         ### build disc losses and optimizers
@@ -289,8 +289,8 @@ class BDCGAN(object):
         ### build generative losses and optimizers
         self.g_learning_rate = tf.placeholder(tf.float32, shape=[])
         self.g_vars = []
-        for gi in xrange(self.num_gen):
-            for m in xrange(self.num_mcmc):
+        for gi in range(self.num_gen):
+            for m in range(self.num_mcmc):
                 self.g_vars.append([var for var in t_vars if 'g_' in var.name and "_%04d_%04d" % (gi, m) in var.name])
         
         self.g_losses, self.g_optims, self.g_optims_adam = [], [], []
@@ -386,7 +386,7 @@ class BDCGAN(object):
     def gen_prior(self, gen_params):
         with tf.variable_scope("generator") as scope:
             prior_loss = 0.0
-            for var in gen_params.values():
+            for var in list(gen_params.values()):
                 nn = tf.divide(var, self.prior_std)
                 prior_loss += tf.reduce_mean(tf.multiply(nn, nn))
                 
@@ -397,7 +397,7 @@ class BDCGAN(object):
     def gen_noise(self, gen_params): 
         with tf.variable_scope("generator") as scope:
             noise_loss = 0.0
-            for name, var in gen_params.iteritems():
+            for name, var in gen_params.items():
                 noise_ = tf.contrib.distributions.Normal(mu=0., sigma=self.noise_std*tf.ones(var.get_shape()))
                 noise_loss += tf.reduce_sum(var * noise_.sample())
         noise_loss /= self.dataset_size
@@ -406,7 +406,7 @@ class BDCGAN(object):
     def disc_prior(self, disc_params):
         with tf.variable_scope("discriminator") as scope:
             prior_loss = 0.0
-            for var in disc_params.values():
+            for var in list(disc_params.values()):
                 nn = tf.divide(var, self.prior_std)
                 prior_loss += tf.reduce_mean(tf.multiply(nn, nn))
                 
@@ -417,7 +417,7 @@ class BDCGAN(object):
     def disc_noise(self, disc_params): 
         with tf.variable_scope("discriminator") as scope:
             noise_loss = 0.0
-            for var in disc_params.values():
+            for var in list(disc_params.values()):
                 noise_ = tf.contrib.distributions.Normal(mu=0., sigma=self.noise_std*tf.ones(var.get_shape()))
                 noise_loss += tf.reduce_sum(var * noise_.sample())
         noise_loss /= self.dataset_size

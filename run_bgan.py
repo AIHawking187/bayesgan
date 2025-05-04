@@ -18,14 +18,16 @@ from bgan_util import AttributeDict
 from bgan_util import print_images, MnistDataset, CelebDataset, Cifar10, SVHN, ImageNet
 from bgan import BDCGAN
 
+from fx_eq_dataset import FXEQDataset
+
 
 def get_session():
     if tf.get_default_session() is None:
-        print "Creating new session"
+        print("Creating new session")
         tf.reset_default_graph()
         _SESSION = tf.InteractiveSession()
     else:
-        print "Using old session"
+        print("Using old session")
         _SESSION = tf.get_default_session()
 
     return _SESSION
@@ -48,10 +50,10 @@ def b_dcgan(dataset, args):
                    df_dim=args.df_dim,
                    ml=(args.ml and args.J==1 and args.M==1 and args.J_d==1))
     
-    print "Starting session"
+    print("Starting session")
     session.run(tf.global_variables_initializer())
 
-    print "Starting training loop"
+    print("Starting training loop")
         
     num_train_iter = args.train_iter
 
@@ -65,7 +67,7 @@ def b_dcgan(dataset, args):
     for train_iter in range(num_train_iter):
 
         if train_iter == 5000:
-            print "Switching to user-specified optimizer"
+            print("Switching to user-specified optimizer")
             optimizer_dict = {"disc": dcgan.d_optims_adam,
                               "gen": dcgan.g_optims_adam}
 
@@ -93,21 +95,60 @@ def b_dcgan(dataset, args):
 
         if train_iter > 0 and train_iter % args.n_save == 0:
 
-            print "Iter %i" % train_iter
-            print "Disc losses = %s" % (", ".join(["%.2f" % dl for dl in d_losses]))
-            print "Gen losses = %s" % (", ".join(["%.2f" % gl for gl in g_losses]))
-            
-            print "saving results and samples"
+            def safe_print_losses(label, losses):
+                if isinstance(losses, (list, tuple)):
+                    cleaned = [float(x) for x in losses if x is not None]
+                    if cleaned:
+                        print("{} = {}".format(label, ", ".join(["%.2f" % x for x in cleaned])))
+                    else:
+                        print("{}: None".format(label))
+                else:
+                    if losses is not None:
+                        print("{} = {:.2f}".format(label, float(losses)))
+                    else:
+                        print("{}: None".format(label))
 
-            results = {"disc_losses": map(float, d_losses),
-                       "gen_losses": map(float, g_losses),
-                       "timestamp": time.time()}
+            safe_print_losses("Disc losses", d_losses)
+            safe_print_losses("Gen losses", g_losses)
+
+            print("saving results and samples")
+
+            # Save results safely
+            results = {
+                "disc_losses": [float(x) for x in d_losses if x is not None] if d_losses else [],
+                "gen_losses": [float(x) for x in g_losses if x is not None] if g_losses else []
+            }
+
+            import pandas as pd
+
+            # Save results to CSV
+            # Safely handle missing discriminator losses
+            gen_losses = results.get("gen_losses", [])
+            disc_losses = results.get("disc_losses", [])
+
+            # If discriminator losses are missing, fill with NaNs
+            if len(disc_losses) == 0:
+                disc_losses = [np.nan] * len(gen_losses)
+
+            # Make sure they are same length
+            min_len = min(len(disc_losses), len(gen_losses))
+            disc_losses = disc_losses[:min_len]
+            gen_losses = gen_losses[:min_len]
+
+            # Save as DataFrame
+            df = pd.DataFrame({
+                "disc_loss": disc_losses,
+                "gen_loss": gen_losses
+            })
+            df.to_csv(os.path.join(args.out_dir, "training_losses.csv"), index=False)
+            print("Saved training losses to CSV.")
+
 
             with open(os.path.join(args.out_dir, 'results_%i.json' % train_iter), 'w') as fp:
                 json.dump(results, fp)
             
             if args.save_samples:
-                for zi in xrange(dcgan.num_gen):
+                for zi in range(dcgan.num_gen):
                     _imgs, _ps = [], []
                     for _ in range(10):
                         z_sampler = np.random.uniform(-1, 1, size=(batch_size, z_dim))
@@ -130,7 +171,7 @@ def b_dcgan(dataset, args):
                                     **var_dict)
             
 
-            print "done"
+            print("done")
         
 
 
@@ -260,7 +301,7 @@ if __name__ == "__main__":
     tf.set_random_seed(args.random_seed)
 
     if not os.path.exists(args.out_dir):
-        print "Creating %s" % args.out_dir
+        print("Creating %s" % args.out_dir)
         os.makedirs(args.out_dir)
     args.out_dir = os.path.join(args.out_dir, "bgan_%s_%i" % (args.dataset, int(time.time())))
     os.makedirs(args.out_dir)
@@ -288,6 +329,8 @@ if __name__ == "__main__":
     elif "imagenet" in args.dataset:
         num_classes = int(args.dataset.split("_")[-1])
         dataset = ImageNet(imagenet_path, num_classes)
+    elif args.dataset == "fx_eq":
+        dataset = FXEQDataset(path='../input/raw (FX + EQ).csv')
     else:
         raise RuntimeError("invalid dataset %s" % args.dataset)
 
